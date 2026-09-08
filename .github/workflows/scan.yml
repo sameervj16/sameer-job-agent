@@ -1,0 +1,77 @@
+name: Job Agent Scan
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "30 3 * * *"
+    - cron: "30 13 * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Create scanner
+        run: |
+          cat > scan.py <<'PY'
+          import json,re,urllib.request,datetime
+          from pathlib import Path
+          ROOT=Path("."); C=json.loads((ROOT/"config.json").read_text())
+          def get(u):
+              q=urllib.request.Request(u,headers={"User-Agent":"Mozilla/5.0"})
+              with urllib.request.urlopen(q,timeout=30) as r:return json.loads(r.read().decode())
+          def score(j):
+              t=" ".join(str(j.get(k,"")) for k in ["title","description","location"]).lower()
+              if any(x in t for x in C["exclude"]): return 0
+              s=50+min(25,sum(x in t for x in C["include"])*5)
+              for x in ["api","rest","postman","troubleshooting","production support","python","llm","genai","agent","claude","voice","conversational ai","mcp","sql"]:
+                  if x in t:s+=2
+              if any(x in t for x in ["bengaluru","bangalore","india","remote"]):s+=5
+              m=re.search(r"(\d+)\s*\+?\s*years",t)
+              if m:
+                  y=int(m.group(1))
+                  if y>C["max_experience_years"]:s-=35
+                  elif y<=4:s+=5
+              return max(0,min(100,s))
+          jobs=[]
+          for slug in ["sarvam-ai","kognitos","abnormal-security","cresta"]:
+              try:
+                  d=get(f"https://boards-api.greenhouse.io/v1/boards/{slug}/jobs?content=true")
+                  for x in d.get("jobs",[]):
+                      j={"title":x.get("title",""),"company":slug.replace("-"," ").title(),"location":(x.get("location") or {}).get("name",""),"url":x.get("absolute_url",""),"description":x.get("content","")}
+                      j["fit"]=score(j)
+                      if j["fit"]>=C["min_fit_score"]:
+                          j["reason"]="Matches your target role family and technical/AI support profile."
+                          j["tags"]=["AI/GenAI","Technical","Customer-facing"];jobs.append(j)
+              except Exception as e:print("Greenhouse",slug,e)
+          for slug in ["locus-sh","deepgram"]:
+              try:
+                  d=get(f"https://api.lever.co/v0/postings/{slug}?mode=json")
+                  for x in d:
+                      cat=x.get("categories") or {}
+                      j={"title":x.get("text",""),"company":slug.replace("-"," ").title(),"location":", ".join(cat.get("allLocations",[])),"url":x.get("hostedUrl",""),"description":x.get("descriptionPlain","")}
+                      j["fit"]=score(j)
+                      if j["fit"]>=C["min_fit_score"]:
+                          j["reason"]="Matches your target role family and technical/AI support profile."
+                          j["tags"]=["AI/GenAI","Technical","Customer-facing"];jobs.append(j)
+              except Exception as e:print("Lever",slug,e)
+          seen=set();out=[]
+          for j in sorted(jobs,key=lambda x:x["fit"],reverse=True):
+              if j["url"] and j["url"] not in seen:seen.add(j["url"]);out.append({k:v for k,v in j.items() if k!="description"})
+          (ROOT/"jobs.json").write_text(json.dumps({"generated_at":datetime.datetime.now(datetime.timezone.utc).isoformat(),"min_fit":C["min_fit_score"],"jobs":out[:C["daily_review_cap"]]},indent=2))
+          PY
+      - name: Run scanner
+        run: python scan.py
+      - name: Commit job feed
+        run: |
+          git config user.name "job-agent"
+          git config user.email "job-agent@users.noreply.github.com"
+          git add jobs.json
+          git diff --cached --quiet || git commit -m "Update job feed"
+          git push
