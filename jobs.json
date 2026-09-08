@@ -1,70 +1,19 @@
 {
-  "generated_at": "2026-09-08T20:01:23.020164+00:00",
+  "generated_at": "2026-09-08T20:09:16.345276+00:00",
   "min_fit": 80,
   "jobs": [
-    {
-      "title": "Associate Forward Deployed Product Manager",
-      "company": "Cresta",
-      "location": "United States, Remote",
-      "url": "https://job-boards.greenhouse.io/cresta/jobs/4992510008",
-      "fit": 90,
-      "reason": "Matches your target role family and technical/AI support profile.",
-      "tags": [
-        "AI/GenAI",
-        "Technical",
-        "Customer-facing"
-      ]
-    },
     {
       "title": "Application Support Engineer",
       "company": "Cresta",
       "location": "United States (Remote)",
       "url": "https://job-boards.greenhouse.io/cresta/jobs/5318826008",
-      "fit": 87,
-      "reason": "Matches your target role family and technical/AI support profile.",
+      "fit": 89,
+      "reason": "Good match: target role with relevant technical, support and AI overlap.",
       "tags": [
+        "Target role",
         "AI/GenAI",
-        "Technical",
-        "Customer-facing"
-      ]
-    },
-    {
-      "title": "Conversational Design, Demo Engineer",
-      "company": "Cresta",
-      "location": "India (Remote)",
-      "url": "https://job-boards.greenhouse.io/cresta/jobs/5146185008",
-      "fit": 85,
-      "reason": "Matches your target role family and technical/AI support profile.",
-      "tags": [
-        "AI/GenAI",
-        "Technical",
-        "Customer-facing"
-      ]
-    },
-    {
-      "title": "Forward Deployed Engineering Intern (AI Agent)",
-      "company": "Cresta",
-      "location": "Toronto, Canada (Hybrid)",
-      "url": "https://job-boards.greenhouse.io/cresta/jobs/5106468008",
-      "fit": 84,
-      "reason": "Matches your target role family and technical/AI support profile.",
-      "tags": [
-        "AI/GenAI",
-        "Technical",
-        "Customer-facing"
-      ]
-    },
-    {
-      "title": "Senior Full Stack Engineer - Conversation Intelligence",
-      "company": "Cresta",
-      "location": "United States (Remote)",
-      "url": "https://job-boards.greenhouse.io/cresta/jobs/5026012008",
-      "fit": 82,
-      "reason": "Matches your target role family and technical/AI support profile.",
-      "tags": [
-        "AI/GenAI",
-        "Technical",
-        "Customer-facing"
+        "API",
+        "Support"
       ]
     }
   ]
