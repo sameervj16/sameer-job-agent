@@ -12,66 +12,497 @@ permissions:
 jobs:
   scan:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Create scanner
+
+      - name: Create improved scanner
         run: |
           cat > scan.py <<'PY'
-          import json,re,urllib.request,datetime
+          import json
+          import re
+          import urllib.request
+          import datetime
           from pathlib import Path
-          ROOT=Path("."); C=json.loads((ROOT/"config.json").read_text())
-          def get(u):
-              q=urllib.request.Request(u,headers={"User-Agent":"Mozilla/5.0"})
-              with urllib.request.urlopen(q,timeout=30) as r:return json.loads(r.read().decode())
-          def score(j):
-              t=" ".join(str(j.get(k,"")) for k in ["title","description","location"]).lower()
-              if any(x in t for x in C["exclude"]): return 0
-              s=50+min(25,sum(x in t for x in C["include"])*5)
-              for x in ["api","rest","postman","troubleshooting","production support","python","llm","genai","agent","claude","voice","conversational ai","mcp","sql"]:
-                  if x in t:s+=2
-              if any(x in t for x in ["bengaluru","bangalore","india","remote"]):s+=5
-              m=re.search(r"(\d+)\s*\+?\s*years",t)
-              if m:
-                  y=int(m.group(1))
-                  if y>C["max_experience_years"]:s-=35
-                  elif y<=4:s+=5
-              return max(0,min(100,s))
-          jobs=[]
-          for slug in ["sarvam-ai","kognitos","abnormal-security","cresta"]:
+
+          C = json.loads(Path("config.json").read_text())
+
+          def get(url):
+              request = urllib.request.Request(
+                  url,
+                  headers={"User-Agent": "Mozilla/5.0"}
+              )
+
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  return json.loads(response.read().decode())
+
+          def norm(value):
+              return re.sub(
+                  r"\s+",
+                  " ",
+                  str(value or "").lower()
+              ).strip()
+
+          def title_score(title):
+              title = norm(title)
+
+              # HARD REJECTION:
+              # These roles should never be rescued by AI keywords.
+              for bad_title in C["hard_exclude_title"]:
+                  if bad_title in title:
+                      return -100, "Unrelated engineering title."
+
+              # Reject managerial / very senior roles.
+              if re.search(
+                  r"\b(principal|staff|director|vp|vice president|head of|manager)\b",
+                  title
+              ):
+                  return -100, "Too senior or managerial."
+
+              # Senior is acceptable only for target support/solutions roles.
+              if "senior" in title:
+                  if not any(
+                      alias in title
+                      for alias in C["title_aliases"]
+                  ):
+                      return -100, "Senior role outside target family."
+
+              # Strong target title.
+              if any(
+                  target in title
+                  for target in C["target_titles"]
+              ):
+                  return 45, "Strong target-title match."
+
+              # Reasonable title variation.
+              if any(
+                  alias in title
+                  for alias in C["title_aliases"]
+              ):
+                  return 35, "Good target-title match."
+
+              # Critical:
+              # AI keywords in the description cannot rescue an unrelated title.
+              return -45, "Title is outside target role families."
+
+          def experience_score(text):
+              numbers = [
+                  int(x)
+                  for x in re.findall(
+                      r"(\d+)\s*\+?\s*years?",
+                      text
+                  )
+              ]
+
+              if any(x >= 6 for x in numbers):
+                  return -25
+
+              if any(x == 5 for x in numbers):
+                  return -8
+
+              if any(x <= 4 for x in numbers):
+                  return 10
+
+              return 5
+
+          def score(job):
+              title = norm(job["title"])
+              description = norm(job["description"])
+              location = norm(job["location"])
+
+              full_text = (
+                  title
+                  + " "
+                  + description
+              )
+
+              # ERP / finance exclusion.
+              for bad in C["hard_exclude_terms"]:
+
+                  if bad in title:
+                      return 0, "Excluded business/ERP/finance role."
+
+                  if bad in description and bad in [
+                      "erp",
+                      "sap",
+                      "oracle erp",
+                      "intacct"
+                  ]:
+                      return 0, "Excluded ERP/business-system role."
+
+              # TITLE FILTER FIRST.
+              title_points, title_reason = title_score(title)
+
+              if title_points < 0:
+                  return 0, title_reason
+
+              score_value = title_points
+
+              # Relevant skills.
+              skill_hits = sum(
+                  1
+                  for skill in C["positive_skills"]
+                  if skill in full_text
+              )
+
+              # Maximum 25 points from skills.
+              score_value += min(
+                  25,
+                  skill_hits * 2
+              )
+
+              # Additional weight for strongest areas.
+              strongest_skills = [
+                  "api",
+                  "postman",
+                  "troubleshooting",
+                  "production support",
+                  "customer support",
+                  "llm",
+                  "genai",
+                  "claude",
+                  "mcp",
+                  "voice ai",
+                  "conversational ai",
+                  "sql",
+                  "python"
+              ]
+
+              for skill in strongest_skills:
+                  if skill in full_text:
+                      score_value += 1
+
+              # Experience requirement.
+              score_value += experience_score(full_text)
+
+              # Location.
+              if any(
+                  location_term in location
+                  or location_term in full_text
+                  for location_term in C["preferred_locations"]
+              ):
+                  score_value += 5
+
+              # Final safety check for unrelated engineering specializations.
+              unrelated = [
+                  "full stack",
+                  "frontend",
+                  "backend",
+                  "data science",
+                  "machine learning",
+                  "deep learning",
+                  "devops",
+                  "sre"
+              ]
+
+              if any(
+                  term in title
+                  for term in unrelated
+              ):
+                  return 0, "Unrelated engineering specialization."
+
+              score_value = max(
+                  0,
+                  min(100, score_value)
+              )
+
+              if score_value >= 90:
+                  reason = (
+                      "Excellent match: target role plus strong "
+                      "API, support and AI overlap."
+                  )
+
+              elif score_value >= 80:
+                  reason = (
+                      "Good match: target role with relevant "
+                      "technical, support and AI overlap."
+                  )
+
+              else:
+                  reason = "Below target threshold."
+
+              return score_value, reason
+
+          jobs = []
+
+          # PUBLIC GREENHOUSE BOARDS
+          greenhouse_companies = [
+              "sarvam-ai",
+              "kognitos",
+              "abnormal-security",
+              "cresta"
+          ]
+
+          for company in greenhouse_companies:
+
               try:
-                  d=get(f"https://boards-api.greenhouse.io/v1/boards/{slug}/jobs?content=true")
-                  for x in d.get("jobs",[]):
-                      j={"title":x.get("title",""),"company":slug.replace("-"," ").title(),"location":(x.get("location") or {}).get("name",""),"url":x.get("absolute_url",""),"description":x.get("content","")}
-                      j["fit"]=score(j)
-                      if j["fit"]>=C["min_fit_score"]:
-                          j["reason"]="Matches your target role family and technical/AI support profile."
-                          j["tags"]=["AI/GenAI","Technical","Customer-facing"];jobs.append(j)
-              except Exception as e:print("Greenhouse",slug,e)
-          for slug in ["locus-sh","deepgram"]:
+
+                  data = get(
+                      "https://boards-api.greenhouse.io/v1/boards/"
+                      + company
+                      + "/jobs?content=true"
+                  )
+
+                  for item in data.get("jobs", []):
+
+                      job = {
+                          "title": item.get(
+                              "title",
+                              ""
+                          ),
+
+                          "company": company.replace(
+                              "-",
+                              " "
+                          ).title(),
+
+                          "location": (
+                              item.get("location") or {}
+                          ).get(
+                              "name",
+                              ""
+                          ),
+
+                          "url": item.get(
+                              "absolute_url",
+                              ""
+                          ),
+
+                          "description": item.get(
+                              "content",
+                              ""
+                          )
+                      }
+
+                      job["fit"], job["reason"] = score(job)
+
+                      if job["fit"] >= C["min_fit_score"]:
+
+                          job["tags"] = [
+                              "Target role"
+                          ]
+
+                          description = norm(
+                              job["description"]
+                          )
+
+                          if any(
+                              x in description
+                              for x in [
+                                  "llm",
+                                  "genai",
+                                  "agent",
+                                  "claude",
+                                  "mcp"
+                              ]
+                          ):
+                              job["tags"].append(
+                                  "AI/GenAI"
+                              )
+
+                          if any(
+                              x in description
+                              for x in [
+                                  "api",
+                                  "rest",
+                                  "postman"
+                              ]
+                          ):
+                              job["tags"].append(
+                                  "API"
+                              )
+
+                          if any(
+                              x in description
+                              for x in [
+                                  "support",
+                                  "troubleshooting",
+                                  "incident"
+                              ]
+                          ):
+                              job["tags"].append(
+                                  "Support"
+                              )
+
+                          jobs.append(job)
+
+              except Exception as error:
+
+                  print(
+                      "Greenhouse error:",
+                      company,
+                      error
+                  )
+
+          # PUBLIC LEVER BOARDS
+          lever_companies = [
+              "locus-sh",
+              "deepgram"
+          ]
+
+          for company in lever_companies:
+
               try:
-                  d=get(f"https://api.lever.co/v0/postings/{slug}?mode=json")
-                  for x in d:
-                      cat=x.get("categories") or {}
-                      j={"title":x.get("text",""),"company":slug.replace("-"," ").title(),"location":", ".join(cat.get("allLocations",[])),"url":x.get("hostedUrl",""),"description":x.get("descriptionPlain","")}
-                      j["fit"]=score(j)
-                      if j["fit"]>=C["min_fit_score"]:
-                          j["reason"]="Matches your target role family and technical/AI support profile."
-                          j["tags"]=["AI/GenAI","Technical","Customer-facing"];jobs.append(j)
-              except Exception as e:print("Lever",slug,e)
-          seen=set();out=[]
-          for j in sorted(jobs,key=lambda x:x["fit"],reverse=True):
-              if j["url"] and j["url"] not in seen:seen.add(j["url"]);out.append({k:v for k,v in j.items() if k!="description"})
-          (ROOT/"jobs.json").write_text(json.dumps({"generated_at":datetime.datetime.now(datetime.timezone.utc).isoformat(),"min_fit":C["min_fit_score"],"jobs":out[:C["daily_review_cap"]]},indent=2))
+
+                  data = get(
+                      "https://api.lever.co/v0/postings/"
+                      + company
+                      + "?mode=json"
+                  )
+
+                  for item in data:
+
+                      categories = (
+                          item.get("categories") or {}
+                      )
+
+                      job = {
+                          "title": item.get(
+                              "text",
+                              ""
+                          ),
+
+                          "company": company.replace(
+                              "-",
+                              " "
+                          ).title(),
+
+                          "location": ", ".join(
+                              categories.get(
+                                  "allLocations",
+                                  []
+                              )
+                          ),
+
+                          "url": item.get(
+                              "hostedUrl",
+                              ""
+                          ),
+
+                          "description": item.get(
+                              "descriptionPlain",
+                              ""
+                          )
+                      }
+
+                      job["fit"], job["reason"] = score(job)
+
+                      if job["fit"] >= C["min_fit_score"]:
+
+                          job["tags"] = [
+                              "Target role"
+                          ]
+
+                          description = norm(
+                              job["description"]
+                          )
+
+                          if any(
+                              x in description
+                              for x in [
+                                  "llm",
+                                  "genai",
+                                  "agent",
+                                  "claude",
+                                  "mcp"
+                              ]
+                          ):
+                              job["tags"].append(
+                                  "AI/GenAI"
+                              )
+
+                          if any(
+                              x in description
+                              for x in [
+                                  "api",
+                                  "rest",
+                                  "postman"
+                              ]
+                          ):
+                              job["tags"].append(
+                                  "API"
+                              )
+
+                          if any(
+                              x in description
+                              for x in [
+                                  "support",
+                                  "troubleshooting",
+                                  "incident"
+                              ]
+                          ):
+                              job["tags"].append(
+                                  "Support"
+                              )
+
+                          jobs.append(job)
+
+              except Exception as error:
+
+                  print(
+                      "Lever error:",
+                      company,
+                      error
+                  )
+
+          # Remove duplicates.
+          seen = set()
+          clean_jobs = []
+
+          for job in sorted(
+              jobs,
+              key=lambda x: x["fit"],
+              reverse=True
+          ):
+
+              url = job["url"]
+
+              if url and url not in seen:
+
+                  seen.add(url)
+
+                  clean_jobs.append({
+                      key: value
+                      for key, value in job.items()
+                      if key != "description"
+                  })
+
+          output = {
+              "generated_at": datetime.datetime.now(
+                  datetime.timezone.utc
+              ).isoformat(),
+
+              "min_fit": C["min_fit_score"],
+
+              "jobs": clean_jobs[
+                  :C["daily_review_cap"]
+              ]
+          }
+
+          Path("jobs.json").write_text(
+              json.dumps(
+                  output,
+                  indent=2
+              )
+          )
+
+          print(
+              "Qualified jobs:",
+              len(clean_jobs)
+          )
           PY
-      - name: Run scanner
+
+      - name: Run improved scanner
         run: python scan.py
-      - name: Commit job feed
+
+      - name: Commit updated job feed
         run: |
           git config user.name "job-agent"
           git config user.email "job-agent@users.noreply.github.com"
           git add jobs.json
-          git diff --cached --quiet || git commit -m "Update job feed"
+          git diff --cached --quiet || git commit -m "Improve job scoring and update feed"
           git push
