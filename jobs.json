@@ -1,20 +1,10 @@
 {
-  "generated_at": "2026-09-09T08:16:42.634001+00:00",
+  "generated_at": "2026-09-09T08:42:30.492019+00:00",
   "min_fit": 80,
-  "jobs": [
-    {
-      "title": "Application Support Engineer",
-      "company": "Cresta",
-      "location": "United States (Remote)",
-      "url": "https://job-boards.greenhouse.io/cresta/jobs/5318826008",
-      "fit": 89,
-      "reason": "Good match: target role with relevant technical, support and AI overlap.",
-      "tags": [
-        "Target role",
-        "AI/GenAI",
-        "API",
-        "Support"
-      ]
-    }
-  ]
+  "profile": {
+    "name": "Sameer Joshi",
+    "location": "Bengaluru, India",
+    "experience_years": 3.75
+  },
+  "jobs": []
 }
