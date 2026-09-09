@@ -5,6 +5,7 @@ on:
   schedule:
     # 9:00 AM IST
     - cron: "30 3 * * *"
+
     # 7:00 PM IST
     - cron: "30 13 * * *"
 
@@ -35,57 +36,76 @@ jobs:
           CONFIG_FILE = "config.json"
           OUTPUT_FILE = "jobs.json"
 
+          # =========================================================
+          # LOAD CONFIG
+          # =========================================================
+
           with open(CONFIG_FILE, "r", encoding="utf-8") as f:
               config = json.load(f)
 
           PROFILE = config.get("profile", {})
-          MIN_FIT = config.get("min_fit_score", config.get("min_fit", 80))
-          MAX_EXP = config.get("max_experience_years", 5)
 
-          TARGET_TITLES = [
-              x.lower()
+          # v3 intentionally uses 70 as the discovery threshold.
+          # Jobs are still ranked by score.
+          MIN_FIT = 70
+
+          MAX_EXP = config.get(
+              "max_experience_years",
+              5
+          )
+
+          DAILY_CAP = config.get(
+              "daily_review_cap",
+              30
+          )
+
+          CONFIG_TARGET_TITLES = [
+              str(x).lower().strip()
               for x in config.get("target_titles", [])
           ]
 
-          TITLE_ALIASES = [
-              x.lower()
+          CONFIG_ALIASES = [
+              str(x).lower().strip()
               for x in config.get("title_aliases", [])
           ]
 
-          HARD_EXCLUDE_TITLES = [
-              x.lower()
+          CONFIG_EXCLUDE_TITLES = [
+              str(x).lower().strip()
               for x in config.get("hard_exclude_title", [])
           ]
 
-          HARD_EXCLUDE_TERMS = [
-              x.lower()
+          CONFIG_EXCLUDE_TERMS = [
+              str(x).lower().strip()
               for x in config.get("hard_exclude_terms", [])
           ]
 
-          POSITIVE_SKILLS = [
-              x.lower()
+          CONFIG_SKILLS = [
+              str(x).lower().strip()
               for x in config.get("positive_skills", [])
           ]
 
-          # ---------------------------------------------------------
-          # Additional exclusions specifically for Sameer's profile
-          # ---------------------------------------------------------
+          # =========================================================
+          # SAMEER-SPECIFIC ROLE FILTERS
+          # =========================================================
 
-          EXTRA_EXCLUDE_TITLES = [
-              "software engineer",
-              "software developer",
+          # Roles that are clearly outside Sameer's target.
+          HARD_EXCLUDE_TITLE_PATTERNS = [
               "full stack engineer",
               "full-stack engineer",
               "frontend engineer",
               "front end engineer",
               "backend engineer",
               "back end engineer",
+              "software developer",
+              "software development engineer",
+              "software engineer",
               "web developer",
               "mobile developer",
               "data scientist",
               "data engineer",
               "machine learning engineer",
               "deep learning engineer",
+              "ml engineer",
               "devops engineer",
               "site reliability engineer",
               "sre",
@@ -99,10 +119,44 @@ jobs:
               "staff engineer",
               "engineering manager",
               "director of engineering",
-              "vp engineering"
+              "vp engineering",
+              "vice president engineering",
+              "head of engineering"
           ]
 
-          EXTRA_EXCLUDE_TERMS = [
+          SENIORITY_TERMS = [
+              "principal",
+              "staff",
+              "director",
+              "vice president",
+              "vp ",
+              "head of",
+              "engineering manager"
+          ]
+
+          # Pure commercial roles.
+          SALES_TITLE_PATTERNS = [
+              "account executive",
+              "sales development representative",
+              "business development representative",
+              "sales representative",
+              "sales manager",
+              "sales director",
+              "sales executive",
+              "business development manager"
+          ]
+
+          # Pure CSM roles.
+          PURE_CSM_TITLE_PATTERNS = [
+              "customer success manager",
+              "customer success director",
+              "customer success lead",
+              "customer success associate",
+              "customer success specialist"
+          ]
+
+          # Terms that strongly indicate ERP / finance systems.
+          ERP_TERMS = [
               "enterprise resource planning",
               "erp",
               "sap",
@@ -110,20 +164,17 @@ jobs:
               "oracle fusion",
               "oracle ebs",
               "intacct",
-              "accounting software",
               "accounting system",
+              "accounting software",
               "payroll system",
               "finance system",
               "financial accounting",
               "accounts payable",
-              "accounts receivable",
+              "accounts receivable"
+          ]
 
-              # Pure sales / business development
-              "account executive",
-              "sales development representative",
-              "business development representative",
-              "sales development",
-              "business development",
+          # Strong commercial signals.
+          SALES_TERMS = [
               "sales quota",
               "sales target",
               "commission-based",
@@ -133,79 +184,125 @@ jobs:
               "closing deals",
               "new logo acquisition",
               "sales pipeline",
-
-              # Pure customer success
-              "customer success manager",
-              "customer success director",
-              "customer success lead",
-              "renewals manager",
-              "renewal manager",
-              "account manager",
-              "relationship manager",
-
-              # Deep engineering indicators
-              "kubernetes",
-              "terraform",
-              "react.js",
-              "reactjs",
-              "next.js",
-              "spring boot",
-              "java microservices",
-              "advanced system design",
-              "distributed systems",
-              "large scale distributed systems"
+              "revenue target",
+              "prospecting",
+              "cold calling"
           ]
 
-          # Some terms above should NOT independently reject a job.
-          # They are used as stronger engineering signals instead.
-          DEEP_ENGINEERING_TERMS = [
-              "kubernetes",
-              "terraform",
-              "react.js",
-              "reactjs",
-              "next.js",
-              "spring boot",
-              "java microservices",
-              "advanced system design",
-              "distributed systems",
-              "large scale distributed systems"
+          # =========================================================
+          # TARGET ROLE FAMILY
+          # =========================================================
+
+          TARGET_ROLE_FAMILIES = [
+              "technical support",
+              "application support",
+              "product support",
+              "customer support engineer",
+              "support engineer",
+              "support analyst",
+              "technical support engineer",
+              "application support engineer",
+              "product support engineer",
+              "product support specialist",
+              "ai support",
+              "ai support engineer",
+              "ai solutions engineer",
+              "solutions engineer",
+              "solutions consultant",
+              "implementation engineer",
+              "implementation specialist",
+              "integration engineer",
+              "integration specialist",
+              "customer success engineer",
+              "technical account manager",
+              "technical account engineer",
+              "voice ai engineer",
+              "voice engineer",
+              "conversational ai engineer",
+              "conversation ai engineer",
+              "conversational ai",
+              "agent engineer",
+              "ai agent engineer",
+              "genai engineer",
+              "generative ai engineer",
+              "ai platform support",
+              "ai operations",
+              "ai operations engineer",
+              "llm support",
+              "llm engineer",
+              "forward deployed engineer",
+              "customer engineer"
           ]
 
-          SALES_TERMS = [
-              "quota",
-              "commission",
-              "sales target",
-              "sales pipeline",
-              "new logo",
-              "closing deals",
-              "business development",
-              "account executive",
-              "sales development"
-          ]
+          # =========================================================
+          # HELPERS
+          # =========================================================
 
-          # ---------------------------------------------------------
-          # HTTP helper
-          # ---------------------------------------------------------
+          def normalize(value):
+              value = str(value or "")
+              value = value.lower()
+              value = re.sub(r"\s+", " ", value)
+              return value.strip()
+
+
+          def contains(text, term):
+              return normalize(term) in normalize(text)
+
+
+          def count_terms(text, terms):
+              text = normalize(text)
+
+              count = 0
+
+              for term in terms:
+                  term = normalize(term)
+
+                  if term and term in text:
+                      count += 1
+
+              return count
+
+
+          def unique(items):
+              return list(dict.fromkeys(items))
+
+
+          # =========================================================
+          # FETCH JSON
+          # =========================================================
 
           def fetch_json(url):
               try:
-                  req = urllib.request.Request(
+                  request = urllib.request.Request(
                       url,
                       headers={
-                          "User-Agent": "Sameer-Job-Agent/1.0"
+                          "User-Agent": "Sameer-Job-Agent/3.0"
                       }
                   )
 
-                  with urllib.request.urlopen(req, timeout=30) as response:
-                      return json.loads(response.read().decode("utf-8"))
+                  with urllib.request.urlopen(
+                      request,
+                      timeout=30
+                  ) as response:
 
-              except Exception as e:
-                  print(f"Could not fetch {url}: {e}")
+                      data = response.read().decode(
+                          "utf-8",
+                          errors="replace"
+                      )
+
+                      return json.loads(data)
+
+              except Exception as exc:
+                  print(
+                      f"WARNING: Could not fetch {url}: {exc}"
+                  )
+
                   return None
 
-          # ---------------------------------------------------------
-          # Greenhouse
-          # ---------------------------------------------------------
+
+          # =========================================================
+          # GREENHOUSE SOURCES
+          # =========================================================
 
           GREENHOUSE_BOARDS = [
               "sarvam-ai",
@@ -214,13 +311,17 @@ jobs:
               "cresta"
           ]
 
+
           def get_greenhouse_jobs():
+
               jobs = []
 
               for board in GREENHOUSE_BOARDS:
+
                   url = (
-                      f"https://boards-api.greenhouse.io/v1/boards/"
-                      f"{board}/jobs?content=true"
+                      "https://boards-api.greenhouse.io/v1/boards/"
+                      + board
+                      + "/jobs?content=true"
                   )
 
                   data = fetch_json(url)
@@ -229,36 +330,66 @@ jobs:
                       continue
 
                   for job in data.get("jobs", []):
+
+                      location_data = (
+                          job.get("location") or {}
+                      )
+
                       jobs.append({
-                          "title": job.get("title", ""),
+                          "title": job.get(
+                              "title",
+                              ""
+                          ),
+
                           "company": board,
-                          "location": (
-                              job.get("location", {}) or {}
-                          ).get("name", ""),
-                          "url": job.get("absolute_url", ""),
-                          "description": job.get("content", ""),
-                          "updated_at": job.get("updated_at"),
+
+                          "location": location_data.get(
+                              "name",
+                              ""
+                          ),
+
+                          "url": job.get(
+                              "absolute_url",
+                              ""
+                          ),
+
+                          "description": job.get(
+                              "content",
+                              ""
+                          ),
+
+                          "updated_at": job.get(
+                              "updated_at"
+                          ),
+
+                          "created_at": None,
+
                           "source": "Greenhouse"
                       })
 
               return jobs
 
-          # ---------------------------------------------------------
-          # Lever
-          # ---------------------------------------------------------
+
+          # =========================================================
+          # LEVER SOURCES
+          # =========================================================
 
           LEVER_BOARDS = [
               "locus-sh",
               "deepgram"
           ]
 
+
           def get_lever_jobs():
+
               jobs = []
 
               for board in LEVER_BOARDS:
+
                   url = (
-                      f"https://api.lever.co/v0/postings/"
-                      f"{board}?mode=json"
+                      "https://api.lever.co/v0/postings/"
+                      + board
+                      + "?mode=json"
                   )
 
                   data = fetch_json(url)
@@ -267,177 +398,365 @@ jobs:
                       continue
 
                   for job in data:
-                      categories = job.get("categories", {}) or {}
+
+                      categories = (
+                          job.get(
+                              "categories",
+                              {}
+                          ) or {}
+                      )
 
                       description = (
-                          job.get("descriptionPlain")
-                          or job.get("description")
+                          job.get(
+                              "descriptionPlain"
+                          )
+                          or job.get(
+                              "description"
+                          )
                           or ""
                       )
 
                       jobs.append({
-                          "title": job.get("text", ""),
+                          "title": job.get(
+                              "text",
+                              ""
+                          ),
+
                           "company": board,
-                          "location": categories.get("location", ""),
-                          "url": job.get("hostedUrl", ""),
+
+                          "location": categories.get(
+                              "location",
+                              ""
+                          ),
+
+                          "url": job.get(
+                              "hostedUrl",
+                              ""
+                          ),
+
                           "description": description,
-                          "created_at": job.get("createdAt"),
+
+                          "updated_at": None,
+
+                          "created_at": job.get(
+                              "createdAt"
+                          ),
+
                           "source": "Lever"
                       })
 
               return jobs
 
-          # ---------------------------------------------------------
-          # Text helpers
-          # ---------------------------------------------------------
 
-          def normalize(text):
-              return re.sub(
-                  r"\s+",
-                  " ",
-                  str(text or "").lower()
-              ).strip()
+          # =========================================================
+          # TITLE SCORING
+          # =========================================================
 
-          def contains(text, term):
-              text = normalize(text)
-              term = normalize(term)
+          def score_title(title):
 
-              if not term:
-                  return False
+              title = normalize(title)
 
-              return term in text
-
-          def count_hits(text, terms):
-              text = normalize(text)
-
-              return sum(
-                  1 for term in terms
-                  if term and term in text
-              )
-
-          # ---------------------------------------------------------
-          # TITLE FILTER
-          # ---------------------------------------------------------
-
-          def title_score(title):
-              t = normalize(title)
-
+              # -----------------------------------------------
               # Hard exclusions from config
-              for term in HARD_EXCLUDE_TITLES:
-                  if term and term in t:
-                      return -100, f"Excluded title: {term}"
+              # -----------------------------------------------
 
-              # Additional title exclusions
-              for term in EXTRA_EXCLUDE_TITLES:
-                  if term in t:
-                      return -100, f"Excluded engineering title: {term}"
+              for term in CONFIG_EXCLUDE_TITLES:
 
+                  if term and term in title:
+
+                      return (
+                          -100,
+                          "Excluded by configured title rule"
+                      )
+
+              # -----------------------------------------------
+              # Hard engineering exclusions
+              # -----------------------------------------------
+
+              for term in HARD_EXCLUDE_TITLE_PATTERNS:
+
+                  if term in title:
+
+                      return (
+                          -100,
+                          "Unrelated/deep engineering role"
+                      )
+
+              # -----------------------------------------------
+              # Pure sales
+              # -----------------------------------------------
+
+              for term in SALES_TITLE_PATTERNS:
+
+                  if term in title:
+
+                      return (
+                          -100,
+                          "Pure sales role"
+                      )
+
+              # -----------------------------------------------
+              # Pure CSM
+              # -----------------------------------------------
+
+              for term in PURE_CSM_TITLE_PATTERNS:
+
+                  if term in title:
+
+                      return (
+                          -100,
+                          "Pure customer success management role"
+                      )
+
+              # -----------------------------------------------
               # Seniority
-              senior_terms = [
-                  "principal",
-                  "staff",
-                  "director",
-                  "vice president",
-                  "vp ",
-                  "head of",
-                  "manager"
+              # -----------------------------------------------
+
+              for term in SENIORITY_TERMS:
+
+                  if term in title:
+
+                      # Senior support/solutions roles can remain
+                      # visible for manual review.
+                      allowed_senior = [
+                          "technical support",
+                          "application support",
+                          "product support",
+                          "support engineer",
+                          "solutions engineer",
+                          "implementation",
+                          "integration",
+                          "customer success engineer",
+                          "technical account",
+                          "customer engineer"
+                      ]
+
+                      if not any(
+                          x in title
+                          for x in allowed_senior
+                      ):
+
+                          return (
+                              -100,
+                              "Senior/management role"
+                          )
+
+              # -----------------------------------------------
+              # Exact configured targets
+              # -----------------------------------------------
+
+              if title in CONFIG_TARGET_TITLES:
+
+                  return (
+                      45,
+                      "Exact target title"
+                  )
+
+              # -----------------------------------------------
+              # Configured target phrases
+              # -----------------------------------------------
+
+              if any(
+                  x in title
+                  for x in CONFIG_TARGET_TITLES
+                  if x
+              ):
+
+                  return (
+                      42,
+                      "Target role"
+                  )
+
+              # -----------------------------------------------
+              # Configured aliases
+              # -----------------------------------------------
+
+              if any(
+                  x in title
+                  for x in CONFIG_ALIASES
+                  if x
+              ):
+
+                  return (
+                      38,
+                      "Related target role"
+                  )
+
+              # -----------------------------------------------
+              # Built-in target families
+              # -----------------------------------------------
+
+              if any(
+                  x in title
+                  for x in TARGET_ROLE_FAMILIES
+              ):
+
+                  return (
+                      35,
+                      "Preferred role family"
+                  )
+
+              # -----------------------------------------------
+              # Useful generic technical titles
+              # -----------------------------------------------
+
+              useful_generic = [
+                  "technical analyst",
+                  "support analyst",
+                  "implementation analyst",
+                  "integration analyst",
+                  "technical consultant",
+                  "application analyst"
               ]
 
-              for term in senior_terms:
-                  if term in t:
-                      return -100, f"Senior/management title: {term}"
+              if any(
+                  x in title
+                  for x in useful_generic
+              ):
 
-              # Senior is acceptable only in a very limited situation.
-              # Avoid automatically accepting senior engineering jobs.
-              if "senior" in t:
-                  acceptable = [
-                      "technical support",
-                      "application support",
-                      "product support",
-                      "customer support",
-                      "support engineer",
-                      "solutions engineer",
-                      "implementation engineer",
-                      "customer success engineer",
-                      "technical account manager"
-                  ]
+                  return (
+                      28,
+                      "Potentially relevant technical role"
+                  )
 
-                  if not any(x in t for x in acceptable):
-                      return -100, "Senior role outside preferred support/solutions track"
+              # -----------------------------------------------
+              # Unknown title
+              # -----------------------------------------------
 
-              # Exact target title
-              if any(t == x for x in TARGET_TITLES):
-                  return 45, "Target role"
+              return (
+                  -20,
+                  "Title not strongly aligned"
+              )
 
-              # Target phrase
-              if any(x in t for x in TARGET_TITLES):
-                  return 40, "Target role"
 
-              # Alias
-              if any(x in t for x in TITLE_ALIASES):
-                  return 35, "Related target role"
+          # =========================================================
+          # LOCATION SCORING
+          # =========================================================
 
-              # Do NOT allow AI keywords to rescue an unrelated title.
-              return -45, "Title is not sufficiently aligned"
+          def score_location(location):
 
-          # ---------------------------------------------------------
-          # LOCATION FILTER
-          # ---------------------------------------------------------
+              location = normalize(location)
 
-          def location_score(location):
-              loc = normalize(location)
+              # -----------------------------------------------
+              # India
+              # -----------------------------------------------
 
-              # India-compatible locations
               india_terms = [
                   "bengaluru",
                   "bangalore",
                   "india",
                   "remote india",
-                  "india remote",
-                  "work from anywhere",
+                  "india remote"
+              ]
+
+              if any(
+                  x in location
+                  for x in india_terms
+              ):
+
+                  return (
+                      8,
+                      "India-compatible"
+                  )
+
+              # -----------------------------------------------
+              # Explicit worldwide / anywhere
+              # -----------------------------------------------
+
+              worldwide_terms = [
                   "worldwide",
                   "global remote",
+                  "work from anywhere",
                   "anywhere in the world"
               ]
 
-              if any(term in loc for term in india_terms):
-                  return 5, "India-compatible location"
+              if any(
+                  x in location
+                  for x in worldwide_terms
+              ):
 
-              # Explicit country-restricted locations
-              restricted = [
+                  return (
+                      8,
+                      "Worldwide remote"
+                  )
+
+              # -----------------------------------------------
+              # US restricted
+              # -----------------------------------------------
+
+              us_terms = [
                   "united states",
                   "united states remote",
-                  "usa",
-                  "u.s.",
-                  "us remote",
+                  "usa only",
                   "us only",
-                  "canada only",
-                  "united kingdom only",
-                  "uk only",
-                  "europe only",
-                  "european union only",
-                  "eu only",
-                  "australia only",
-                  "singapore only"
+                  "u.s. only",
+                  "us remote"
               ]
 
-              if any(term in loc for term in restricted):
-                  return -100, "Restricted to another country/region"
+              if any(
+                  x in location
+                  for x in us_terms
+              ):
 
-              # Generic remote is NOT automatically India-compatible.
-              if "remote" in loc:
-                  return 0, "Remote eligibility unclear"
+                  return (
+                      -100,
+                      "US-only location"
+                  )
 
-              return 0, "Location not clearly India-specific"
+              # -----------------------------------------------
+              # Other restricted locations
+              # -----------------------------------------------
 
-          # ---------------------------------------------------------
-          # EXPERIENCE FILTER
-          # ---------------------------------------------------------
+              restricted_terms = [
+                  "united kingdom only",
+                  "uk only",
+                  "canada only",
+                  "australia only",
+                  "singapore only",
+                  "europe only",
+                  "eu only",
+                  "european union only"
+              ]
 
-          def experience_score(text):
+              if any(
+                  x in location
+                  for x in restricted_terms
+              ):
+
+                  return (
+                      -100,
+                      "Restricted international location"
+                  )
+
+              # -----------------------------------------------
+              # Generic remote
+              # -----------------------------------------------
+
+              if "remote" in location:
+
+                  return (
+                      2,
+                      "Remote - India eligibility unclear"
+                  )
+
+              return (
+                  0,
+                  "Location not specified as India"
+              )
+
+
+          # =========================================================
+          # EXPERIENCE SCORING
+          # =========================================================
+
+          def score_experience(text):
+
               text = normalize(text)
 
-              # Explicit 5+ / 6+ / 7+ years
+              # -----------------------------------------------
+              # Explicit X+ years
+              # -----------------------------------------------
+
               patterns = [
                   r"(\d+)\s*\+\s*years",
                   r"minimum of\s*(\d+)\s*years",
@@ -446,324 +765,490 @@ jobs:
               ]
 
               for pattern in patterns:
-                  matches = re.findall(pattern, text)
+
+                  matches = re.findall(
+                      pattern,
+                      text
+                  )
 
                   for value in matches:
+
                       years = int(value)
 
                       if years > MAX_EXP:
-                          return -25, f"Requires {years}+ years"
+
+                          return (
+                              -20,
+                              f"Requires {years}+ years"
+                          )
 
                       if years == 5:
-                          return -5, "Requires approximately 5 years"
+
+                          return (
+                              5,
+                              "Approximately 5 years"
+                          )
 
                       if years <= 4:
-                          return 10, f"Requires {years} years"
 
-              # Ranges such as 3-5 years
+                          return (
+                              10,
+                              f"Requires {years} years"
+                          )
+
+              # -----------------------------------------------
+              # Experience ranges
+              # -----------------------------------------------
+
               ranges = re.findall(
                   r"(\d+)\s*[-–]\s*(\d+)\s*years",
                   text
               )
 
               for low, high in ranges:
+
                   low = int(low)
                   high = int(high)
 
                   if low <= 4:
-                      return 10, f"Experience range {low}-{high} years"
+
+                      return (
+                          10,
+                          f"Experience range {low}-{high} years"
+                      )
 
                   if low > MAX_EXP:
-                      return -25, f"Requires {low}+ years"
 
+                      return (
+                          -20,
+                          f"Requires {low}+ years"
+                      )
+
+              # -----------------------------------------------
               # No explicit requirement
-              return 5, "Experience requirement not clearly specified"
+              # -----------------------------------------------
 
-          # ---------------------------------------------------------
-          # SALES FILTER
-          # ---------------------------------------------------------
-
-          def sales_risk(text):
-              text = normalize(text)
-
-              hits = count_hits(text, SALES_TERMS)
-
-              # Multiple strong sales signals = reject.
-              if hits >= 3:
-                  return True, "Strong sales/quota requirement"
-
-              return False, ""
-
-          # ---------------------------------------------------------
-          # DEEP ENGINEERING FILTER
-          # ---------------------------------------------------------
-
-          def engineering_risk(title, text):
-              t = normalize(title)
-              text = normalize(text)
-
-              hits = count_hits(text, DEEP_ENGINEERING_TERMS)
-
-              # Support/solutions roles can legitimately mention
-              # infrastructure technologies, so don't reject based
-              # on a single technology.
-              if hits >= 4:
-                  return True, "Requires multiple deep engineering technologies"
-
-              # Generic software-engineering language
-              if (
-                  ("software engineering" in text or
-                   "software development" in text)
-                  and
-                  ("design and build" in text or
-                   "develop production systems" in text)
-                  and
-                  not any(x in t for x in [
-                      "support",
-                      "solutions",
-                      "implementation",
-                      "customer success engineer",
-                      "technical account",
-                      "voice",
-                      "agent"
-                  ])
-              ):
-                  return True, "Primarily software engineering"
-
-              return False, ""
-
-          # ---------------------------------------------------------
-          # MAIN SCORING
-          # ---------------------------------------------------------
-
-          def score_job(job):
-              title = job.get("title", "")
-              location = job.get("location", "")
-              description = job.get("description", "")
-
-              full_text = normalize(
-                  f"{title} {description}"
+              return (
+                  5,
+                  "Experience requirement unclear"
               )
 
-              # ---------------------------------------------------
-              # TITLE FIRST
-              # ---------------------------------------------------
 
-              t_score, t_reason = title_score(title)
+          # =========================================================
+          # DOMAIN / JOB CONTENT ANALYSIS
+          # =========================================================
 
-              if t_score <= -100:
-                  return None
+          def analyze_content(title, description):
 
-              # ---------------------------------------------------
-              # LOCATION HARD FILTER
-              # ---------------------------------------------------
+              title = normalize(title)
+              description = normalize(description)
 
-              l_score, l_reason = location_score(location)
+              text = title + " " + description
 
-              if l_score <= -100:
-                  print(
-                      f"REJECT LOCATION: {title} | "
-                      f"{location} | {l_reason}"
-                  )
-                  return None
+              # -----------------------------------------------
+              # ERP check
+              # -----------------------------------------------
 
-              # ---------------------------------------------------
-              # CONFIG HARD EXCLUSIONS
-              # ---------------------------------------------------
+              for term in ERP_TERMS:
 
-              for term in HARD_EXCLUDE_TERMS:
-                  if term and term in full_text:
-                      # Do not reject merely because "finance" appears
-                      # in a generic benefits section.
-                      strong_terms = [
+                  if term in text:
+
+                      # Ignore weak incidental references.
+                      # Strong ERP indicators should reject.
+                      strong_erp = [
                           "erp",
                           "sap",
                           "oracle erp",
+                          "oracle fusion",
+                          "oracle ebs",
                           "intacct",
                           "accounting system",
+                          "accounting software",
                           "payroll system",
                           "finance system",
-                          "pure sales",
-                          "account executive",
-                          "business development",
-                          "customer success manager"
+                          "accounts payable",
+                          "accounts receivable"
                       ]
 
-                      if term in strong_terms:
-                          return None
+                      if term in strong_erp:
 
-              # ---------------------------------------------------
-              # EXTRA SALES FILTER
-              # ---------------------------------------------------
+                          return (
+                              True,
+                              "ERP/finance domain"
+                          )
 
-              is_sales, sales_reason = sales_risk(full_text)
+              # -----------------------------------------------
+              # Pure sales content
+              # -----------------------------------------------
 
-              if is_sales:
-                  return None
-
-              # ---------------------------------------------------
-              # DEEP ENGINEERING FILTER
-              # ---------------------------------------------------
-
-              is_engineering, engineering_reason = engineering_risk(
-                  title,
-                  full_text
+              sales_hits = count_terms(
+                  text,
+                  SALES_TERMS
               )
 
-              if is_engineering:
-                  return None
+              if sales_hits >= 4:
 
-              # ---------------------------------------------------
-              # EXPERIENCE
-              # ---------------------------------------------------
+                  return (
+                      True,
+                      "Strong sales/quota requirement"
+                  )
 
-              e_score, e_reason = experience_score(full_text)
-
-              # Very high experience requirements should be removed.
-              if e_score <= -25:
-                  return None
-
-              # ---------------------------------------------------
-              # SKILL MATCH
-              # ---------------------------------------------------
-
-              skill_hits = [
-                  skill
-                  for skill in POSITIVE_SKILLS
-                  if skill and skill in full_text
-              ]
-
-              # Remove duplicates while preserving order.
-              skill_hits = list(dict.fromkeys(skill_hits))
-
-              # Maximum contribution from skills = 25
-              skill_score = min(
-                  len(skill_hits) * 2,
-                  25
+              return (
+                  False,
+                  ""
               )
 
-              # ---------------------------------------------------
-              # STRONG MATCH BONUS
-              # ---------------------------------------------------
 
-              strong_terms = [
+          # =========================================================
+          # SKILL MATCHING
+          # =========================================================
+
+          def get_skill_matches(text):
+
+              text = normalize(text)
+
+              matches = []
+
+              for skill in CONFIG_SKILLS:
+
+                  if skill and skill in text:
+
+                      matches.append(skill)
+
+              # Additional important profile skills
+              additional_skills = [
                   "rest api",
+                  "rest apis",
                   "api troubleshooting",
                   "postman",
+                  "json",
+                  "webhooks",
+                  "webhook",
                   "production support",
                   "incident management",
-                  "root cause",
+                  "root cause analysis",
                   "rca",
+                  "sla",
+                  "customer support",
+                  "technical support",
                   "llm",
+                  "genai",
                   "generative ai",
                   "ai agent",
+                  "ai agents",
                   "agentic ai",
                   "claude",
+                  "model context protocol",
                   "mcp",
+                  "prompt engineering",
                   "voice ai",
                   "conversational ai",
                   "ivr",
                   "ssml",
-                  "salesforce"
+                  "salesforce",
+                  "sql",
+                  "python",
+                  "aws",
+                  "cloudwatch",
+                  "jira",
+                  "sumo logic"
               ]
 
-              strong_hits = count_hits(
-                  full_text,
-                  strong_terms
+              for skill in additional_skills:
+
+                  if skill in text:
+
+                      matches.append(skill)
+
+              return unique(matches)
+
+
+          # =========================================================
+          # SCORE JOB
+          # =========================================================
+
+          def score_job(job):
+
+              title = job.get(
+                  "title",
+                  ""
               )
 
-              strong_bonus = min(strong_hits, 8)
+              location = job.get(
+                  "location",
+                  ""
+              )
 
-              # ---------------------------------------------------
-              # FINAL SCORE
-              # ---------------------------------------------------
+              description = job.get(
+                  "description",
+                  ""
+              )
 
-              score = 0
+              full_text = normalize(
+                  title + " " + description
+              )
 
-              score += t_score
-              score += skill_score
-              score += strong_bonus
-              score += e_score
-              score += l_score
+              # -----------------------------------------------
+              # Title
+              # -----------------------------------------------
 
-              # Small bonus for customer-facing technical work
-              customer_terms = [
-                  "customer support",
-                  "technical support",
-                  "customer-facing",
-                  "customer facing",
-                  "enterprise customers",
-                  "client support",
-                  "customer issues",
-                  "customer escalations"
-              ]
+              title_points, title_reason = score_title(
+                  title
+              )
 
-              if count_hits(full_text, customer_terms) >= 2:
-                  score += 5
+              if title_points <= -100:
 
-              # Strong API/support combination
+                  print(
+                      "REJECT TITLE:",
+                      title
+                  )
+
+                  return None
+
+              # -----------------------------------------------
+              # Location
+              # -----------------------------------------------
+
+              location_points, location_reason = score_location(
+                  location
+              )
+
+              if location_points <= -100:
+
+                  print(
+                      "REJECT LOCATION:",
+                      title,
+                      "|",
+                      location
+                  )
+
+                  return None
+
+              # -----------------------------------------------
+              # Content exclusions
+              # -----------------------------------------------
+
+              rejected, rejection_reason = analyze_content(
+                  title,
+                  description
+              )
+
+              if rejected:
+
+                  print(
+                      "REJECT CONTENT:",
+                      title,
+                      "|",
+                      rejection_reason
+                  )
+
+                  return None
+
+              # -----------------------------------------------
+              # Experience
+              # -----------------------------------------------
+
+              experience_points, experience_reason = (
+                  score_experience(full_text)
+              )
+
+              if experience_points <= -20:
+
+                  print(
+                      "REJECT EXPERIENCE:",
+                      title,
+                      "|",
+                      experience_reason
+                  )
+
+                  return None
+
+              # -----------------------------------------------
+              # Skill matches
+              # -----------------------------------------------
+
+              skill_matches = get_skill_matches(
+                  full_text
+              )
+
+              skill_points = min(
+                  len(skill_matches) * 2,
+                  24
+              )
+
+              # -----------------------------------------------
+              # High-value combinations
+              # -----------------------------------------------
+
+              bonus = 0
+
+              # API + support
               if (
                   "api" in full_text
-                  and
-                  (
+                  and (
                       "support" in full_text
-                      or "troubleshooting" in full_text
+                      or "troubleshoot" in full_text
                   )
               ):
-                  score += 4
 
-              # AI + support combination
+                  bonus += 5
+
+              # AI + support
               if (
                   (
                       "ai" in full_text
                       or "llm" in full_text
                       or "generative ai" in full_text
                   )
-                  and
-                  (
+                  and (
                       "support" in full_text
                       or "customer" in full_text
                   )
               ):
-                  score += 4
 
-              # ---------------------------------------------------
-              # Clamp
-              # ---------------------------------------------------
+                  bonus += 5
 
-              score = max(0, min(100, score))
+              # Voice/conversational AI
+              if (
+                  "voice ai" in full_text
+                  or "conversational ai" in full_text
+                  or "ivr" in full_text
+                  or "ssml" in full_text
+              ):
 
-              # ---------------------------------------------------
-              # Reason / tags
-              # ---------------------------------------------------
+                  bonus += 5
+
+              # Customer-facing technical work
+              customer_terms = [
+                  "customer-facing",
+                  "customer facing",
+                  "enterprise customers",
+                  "customer support",
+                  "technical support",
+                  "client support",
+                  "customer issues",
+                  "customer escalations"
+              ]
+
+              customer_hits = count_terms(
+                  full_text,
+                  customer_terms
+              )
+
+              if customer_hits >= 2:
+
+                  bonus += 5
+
+              # Integration/API work
+              integration_terms = [
+                  "integration",
+                  "api",
+                  "webhook",
+                  "rest",
+                  "postman"
+              ]
+
+              if count_terms(
+                  full_text,
+                  integration_terms
+              ) >= 3:
+
+                  bonus += 4
+
+              # -----------------------------------------------
+              # Final score
+              # -----------------------------------------------
+
+              score = (
+                  title_points
+                  + skill_points
+                  + experience_points
+                  + location_points
+                  + bonus
+              )
+
+              score = max(
+                  0,
+                  min(100, score)
+              )
+
+              # -----------------------------------------------
+              # Quality
+              # -----------------------------------------------
+
+              if score >= 90:
+
+                  quality = "Excellent match"
+
+              elif score >= 80:
+
+                  quality = "Strong match"
+
+              elif score >= 70:
+
+                  quality = "Review"
+
+              else:
+
+                  quality = "Weak match"
+
+              # -----------------------------------------------
+              # Minimum discovery threshold
+              # -----------------------------------------------
+
+              if score < MIN_FIT:
+
+                  return None
+
+              # -----------------------------------------------
+              # Tags
+              # -----------------------------------------------
 
               tags = []
 
-              if t_score >= 40:
-                  tags.append("Target role")
-              elif t_score >= 35:
-                  tags.append("Related role")
+              if title_points >= 40:
+
+                  tags.append(
+                      "Target role"
+                  )
+
+              elif title_points >= 35:
+
+                  tags.append(
+                      "Preferred role"
+                  )
 
               if any(
                   x in full_text
                   for x in [
                       "ai",
                       "llm",
+                      "genai",
                       "generative ai",
                       "claude",
-                      "agentic ai"
+                      "agentic ai",
+                      "ai agent"
                   ]
               ):
-                  tags.append("AI/GenAI")
+
+                  tags.append(
+                      "AI/GenAI"
+                  )
 
               if "api" in full_text:
-                  tags.append("API")
+
+                  tags.append(
+                      "API"
+                  )
 
               if (
                   "support" in full_text
-                  or "troubleshooting" in full_text
+                  or "troubleshoot" in full_text
               ):
-                  tags.append("Support")
+
+                  tags.append(
+                      "Support"
+                  )
 
               if (
                   "voice ai" in full_text
@@ -771,133 +1256,241 @@ jobs:
                   or "ivr" in full_text
                   or "ssml" in full_text
               ):
-                  tags.append("Voice/Conversational AI")
+
+                  tags.append(
+                      "Voice/Conversational AI"
+                  )
 
               if (
-                  "implementation" in normalize(title)
-                  or "solutions" in normalize(title)
+                  "solution" in normalize(title)
+                  or "implementation" in normalize(title)
                   or "integration" in normalize(title)
               ):
-                  tags.append("Solutions/Implementation")
 
-              if l_score == 5:
-                  tags.append("India-compatible")
+                  tags.append(
+                      "Solutions/Implementation"
+                  )
+
+              if location_points >= 8:
+
+                  tags.append(
+                      "India-compatible"
+                  )
+
               elif "remote" in normalize(location):
-                  tags.append("Remote eligibility unclear")
 
-              tags = list(dict.fromkeys(tags))
+                  tags.append(
+                      "Remote eligibility unclear"
+                  )
+
+              if experience_points >= 10:
+
+                  tags.append(
+                      "Experience aligned"
+                  )
+
+              tags = unique(tags)
+
+              # -----------------------------------------------
+              # Human-readable reason
+              # -----------------------------------------------
 
               reasons = [
-                  t_reason,
-                  e_reason,
-                  l_reason
+                  title_reason,
+                  experience_reason,
+                  location_reason
               ]
 
-              if skill_hits:
+              if skill_matches:
+
                   reasons.append(
-                      f"{len(skill_hits)} relevant skill matches"
+                      f"{len(skill_matches)} relevant skill matches"
                   )
 
-              if strong_hits:
+              if bonus:
+
                   reasons.append(
-                      f"{strong_hits} strong profile matches"
+                      f"{bonus} profile-alignment bonus"
                   )
 
-              if score >= 90:
-                  quality = "Excellent match"
-              elif score >= 80:
-                  quality = "Good match"
-              elif score >= 70:
-                  quality = "Possible match"
-              else:
-                  quality = "Weak match"
-
-              # Only return jobs meeting configured threshold.
-              if score < MIN_FIT:
-                  return None
+              # -----------------------------------------------
+              # Result
+              # -----------------------------------------------
 
               return {
                   "title": title,
-                  "company": job.get("company", ""),
+                  "company": job.get(
+                      "company",
+                      ""
+                  ),
                   "location": location,
-                  "url": job.get("url", ""),
+                  "url": job.get(
+                      "url",
+                      ""
+                  ),
                   "fit": score,
                   "quality": quality,
                   "reason": "; ".join(reasons),
                   "tags": tags,
-                  "matched_skills": skill_hits[:15],
-                  "source": job.get("source", ""),
-                  "updated_at": job.get("updated_at"),
-                  "created_at": job.get("created_at")
+                  "matched_skills": skill_matches[:20],
+                  "source": job.get(
+                      "source",
+                      ""
+                  ),
+                  "updated_at": job.get(
+                      "updated_at"
+                  ),
+                  "created_at": job.get(
+                      "created_at"
+                  )
               }
 
-          # ---------------------------------------------------------
-          # FETCH
-          # ---------------------------------------------------------
 
-          print("Fetching Greenhouse jobs...")
+          # =========================================================
+          # RUN SCAN
+          # =========================================================
+
+          print("=" * 70)
+          print("SAMEER JOB AGENT v3")
+          print("=" * 70)
+
+          print(
+              "Profile:",
+              PROFILE.get(
+                  "name",
+                  "Sameer Joshi"
+              )
+          )
+
+          print(
+              "Location:",
+              PROFILE.get(
+                  "location",
+                  "Bengaluru, India"
+              )
+          )
+
+          print(
+              "Experience:",
+              PROFILE.get(
+                  "experience_years",
+                  3.75
+              ),
+              "years"
+          )
+
+          print(
+              "Minimum discovery score:",
+              MIN_FIT
+          )
+
+          print("=" * 70)
+
           greenhouse_jobs = get_greenhouse_jobs()
 
-          print("Fetching Lever jobs...")
           lever_jobs = get_lever_jobs()
 
-          all_jobs = greenhouse_jobs + lever_jobs
+          all_jobs = (
+              greenhouse_jobs
+              + lever_jobs
+          )
 
-          print(f"Total jobs fetched: {len(all_jobs)}")
+          print(
+              "Greenhouse jobs:",
+              len(greenhouse_jobs)
+          )
 
-          # ---------------------------------------------------------
-          # SCORE
-          # ---------------------------------------------------------
+          print(
+              "Lever jobs:",
+              len(lever_jobs)
+          )
+
+          print(
+              "Total jobs fetched:",
+              len(all_jobs)
+          )
+
+          # =========================================================
+          # SCORE + DEDUPLICATE
+          # =========================================================
 
           results = []
 
-          seen = set()
+          seen_urls = set()
 
           for job in all_jobs:
+
               result = score_job(job)
 
               if not result:
+
                   continue
 
-              url = result.get("url", "").strip()
+              url = result.get(
+                  "url",
+                  ""
+              ).strip()
 
               if not url:
+
                   continue
 
-              if url in seen:
+              if url in seen_urls:
+
                   continue
 
-              seen.add(url)
+              seen_urls.add(url)
+
               results.append(result)
 
-          # Highest score first
+          # =========================================================
+          # SORT
+          # =========================================================
+
           results.sort(
-              key=lambda x: x.get("fit", 0),
+              key=lambda x: (
+                  x.get("fit", 0),
+                  x.get("title", "")
+              ),
               reverse=True
           )
 
-          # Keep dashboard manageable
-          daily_cap = config.get("daily_review_cap", 30)
+          results = results[:DAILY_CAP]
 
-          results = results[:daily_cap]
+          # =========================================================
+          # OUTPUT
+          # =========================================================
 
           output = {
               "generated_at": datetime.now(
                   timezone.utc
               ).isoformat(),
 
+              "scanner_version": "3.0",
+
               "min_fit": MIN_FIT,
 
               "profile": {
-                  "name": PROFILE.get("name", "Sameer Joshi"),
+                  "name": PROFILE.get(
+                      "name",
+                      "Sameer Joshi"
+                  ),
+
                   "location": PROFILE.get(
                       "location",
                       "Bengaluru, India"
                   ),
+
                   "experience_years": PROFILE.get(
                       "experience_years",
                       3.75
                   )
+              },
+
+              "summary": {
+                  "jobs_fetched": len(all_jobs),
+                  "jobs_matching": len(results),
+                  "daily_review_cap": DAILY_CAP
               },
 
               "jobs": results
@@ -908,6 +1501,7 @@ jobs:
               "w",
               encoding="utf-8"
           ) as f:
+
               json.dump(
                   output,
                   f,
@@ -915,17 +1509,25 @@ jobs:
                   ensure_ascii=False
               )
 
+          print("=" * 70)
           print(
-              f"Matching jobs saved: {len(results)}"
+              "MATCHING JOBS:",
+              len(results)
           )
+          print("=" * 70)
 
           for job in results:
+
               print(
-                  f"{job['fit']} | "
+                  f"[{job['fit']}] "
                   f"{job['title']} | "
                   f"{job['company']} | "
                   f"{job['location']}"
               )
+
+          print("=" * 70)
+          print("Scan complete.")
+          print("=" * 70)
 
           PY
 
@@ -941,6 +1543,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "No changes to jobs.json"
           else
-            git commit -m "Update job matches"
+            git commit -m "Update job matches - v3"
             git push
           fi
