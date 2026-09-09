@@ -1,10 +1,76 @@
 {
-  "generated_at": "2026-09-09T08:42:30.492019+00:00",
-  "min_fit": 80,
+  "generated_at": "2026-09-09T08:47:22.795800+00:00",
+  "scanner_version": "3.0",
+  "min_fit": 70,
   "profile": {
     "name": "Sameer Joshi",
     "location": "Bengaluru, India",
     "experience_years": 3.75
   },
-  "jobs": []
+  "summary": {
+    "jobs_fetched": 95,
+    "jobs_matching": 2,
+    "daily_review_cap": 30
+  },
+  "jobs": [
+    {
+      "title": "Forward Deployed Engineering Intern (AI Agent)",
+      "company": "cresta",
+      "location": "Toronto, Canada (Hybrid)",
+      "url": "https://job-boards.greenhouse.io/cresta/jobs/5106468008",
+      "fit": 84,
+      "quality": "Strong match",
+      "reason": "Target role; Experience requirement unclear; Location not specified as India; 9 relevant skill matches; 19 profile-alignment bonus",
+      "tags": [
+        "Target role",
+        "AI/GenAI",
+        "API",
+        "Support",
+        "Voice/Conversational AI"
+      ],
+      "matched_skills": [
+        "rest",
+        "api",
+        "troubleshooting",
+        "llm",
+        "ai agent",
+        "prompt engineering",
+        "conversational ai",
+        "python",
+        "ai agents"
+      ],
+      "source": "Greenhouse",
+      "updated_at": "2026-08-03T16:39:33-04:00",
+      "created_at": null
+    },
+    {
+      "title": "Forward Deployed Product Manager - AI Agent (EMEA)",
+      "company": "cresta",
+      "location": "United Kingdom (Remote)",
+      "url": "https://job-boards.greenhouse.io/cresta/jobs/5068157008",
+      "fit": 83,
+      "quality": "Strong match",
+      "reason": "Related target role; Approximately 5 years; Remote - India eligibility unclear; 7 relevant skill matches; 24 profile-alignment bonus",
+      "tags": [
+        "Preferred role",
+        "AI/GenAI",
+        "API",
+        "Support",
+        "Voice/Conversational AI",
+        "Remote eligibility unclear"
+      ],
+      "matched_skills": [
+        "rest",
+        "api",
+        "customer support",
+        "llm",
+        "ai agent",
+        "conversational ai",
+        "ai agents"
+      ],
+      "source": "Greenhouse",
+      "updated_at": "2026-08-03T16:39:33-04:00",
+      "created_at": null
+    }
+  ]
 }
